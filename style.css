@@ -1,0 +1,13 @@
+window {
+    background-color: grey;
+}
+
+.timer-label {
+    min-height: 150px;
+    min-width: 150px;
+    padding: 40px;
+    margin: 24px;
+    font-size: 36px;
+    border: 1px solid white;
+    border-radius: 9999px;
+}
