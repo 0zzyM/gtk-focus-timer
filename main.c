@@ -11,7 +11,7 @@ gboolean isFirstClick = 1;
 
 typedef struct {
     GtkWidget *timerLabel;
-    GtkWidget *startButton;
+    GtkWidget *playButton;
 } userData;
 
 static void reset_timer(GtkButton *reset_button, gpointer user_data) {
@@ -21,8 +21,8 @@ static void reset_timer(GtkButton *reset_button, gpointer user_data) {
         sourceID = 0;
     }
     userData *uD = user_data;
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->startButton), 0);
-    gtk_button_set_label(GTK_BUTTON(uD->startButton), "►");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->playButton), 0);
+    gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), "25:00");
 }
 
@@ -42,20 +42,20 @@ static gboolean calculate_remaining(gpointer data) {
     return 1;
 }
 
-static void start_timer(GtkToggleButton *start_button, gpointer data) {
+static void play_timer(GtkToggleButton *play_button, gpointer data) {
 
     if (isFirstClick) {
         target = g_get_monotonic_time() + (POMODORO_TIME * 1000000);
         calculate_remaining(data);
         isFirstClick = 0;
     }
-    if (gtk_toggle_button_get_active(start_button)) {
+    if (gtk_toggle_button_get_active(play_button)) {
         target = g_get_monotonic_time() + remaining_total_s * 1000000;
-        gtk_button_set_label(GTK_BUTTON(start_button), "⏸");
+        gtk_button_set_label(GTK_BUTTON(play_button), "⏸");
         sourceID =
             g_timeout_add(1000, G_SOURCE_FUNC(calculate_remaining), data);
     } else {
-        gtk_button_set_label(GTK_BUTTON(start_button), "►");
+        gtk_button_set_label(GTK_BUTTON(play_button), "►");
         if (sourceID != 0) {
             g_source_remove(sourceID);
             sourceID = 0;
@@ -65,7 +65,7 @@ static void start_timer(GtkToggleButton *start_button, gpointer data) {
 
 static void activate(GtkApplication *app, gpointer user_data) {
     GtkWidget *window;
-    GtkWidget *start_button;
+    GtkWidget *play_button;
     GtkWidget *settings_button;
     GtkWidget *reset_button;
     GtkWidget *grid;
@@ -89,23 +89,23 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_add_css_class(GTK_WIDGET(timer_label), "timer-label");
 
     gtk_window_set_child(GTK_WINDOW(window), grid);
-    start_button = gtk_toggle_button_new_with_label("▸");
+    play_button = gtk_toggle_button_new_with_label("▸");
     settings_button = gtk_button_new_with_label("⚙");
     reset_button = gtk_button_new_with_label("↻");
 
-    gtk_widget_add_css_class(GTK_WIDGET(start_button), "action-btn");
+    gtk_widget_add_css_class(GTK_WIDGET(play_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(settings_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(reset_button), "action-btn");
 
-    g_signal_connect(start_button, "toggled", G_CALLBACK(start_timer),
+    g_signal_connect(play_button, "toggled", G_CALLBACK(play_timer),
                      timer_label);
 
     static userData ud;
     ud.timerLabel = timer_label;
-    ud.startButton = start_button;
+    ud.playButton = play_button;
 
     g_signal_connect(reset_button, "clicked", G_CALLBACK(reset_timer), &ud);
-    gtk_grid_attach(GTK_GRID(grid), start_button, 10, 28, 2, 2);
+    gtk_grid_attach(GTK_GRID(grid), play_button, 10, 28, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), settings_button, 12, 28, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), reset_button, 14, 28, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), timer_label, 0, 0, 24, 24);
