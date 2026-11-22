@@ -3,16 +3,49 @@
 #include <gtk/gtk.h>
 #include <stdint.h>
 #include <stdio.h>
-
-const uint32_t POMODORO_TIME = 25 * 60, BREAK_TIME = 5 * 60,
-               FOCUT_TIME = 50 * 60, LONG_BREAK_TIME = 10 * 60;
+const uint16_t FOCUS_M = 25, BREAK_M = 5;
+const uint32_t FOCUS_TIME = FOCUS_M * 60, BREAK_TIME = BREAK_M * 60;
 gint64 ms, target, remaining_total_s, remaining_m, remaining_s, sourceID = 0;
-gboolean isFirstClick = 1;
+gboolean isFirstClick = 1, isFocusMode = 1;
 
 typedef struct {
     GtkWidget *timerLabel;
     GtkWidget *playButton;
 } userData;
+
+static void switch_to_focus_mode(GtkButton *focus_button, gpointer user_data) {
+    userData *uD = user_data;
+    isFirstClick = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->playButton), 0);
+    if (isFocusMode != 1) {
+        isFocusMode = 1;
+
+        gchar *new_label = g_strdup_printf("%d:00", FOCUS_TIME / 60);
+        gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
+        if (sourceID != 0) {
+            g_source_remove(sourceID);
+            sourceID = 0;
+            gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
+        }
+    }
+}
+
+static void switch_to_break_mode(GtkButton *break_button, gpointer user_data) {
+    userData *uD = user_data;
+    isFirstClick = 1;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->playButton), 0);
+    if (isFocusMode != 0) {
+        isFocusMode = 0;
+        gchar *new_label = g_strdup_printf(
+            "%d:00", (isFocusMode ? FOCUS_TIME / 60 : BREAK_TIME / 60));
+        gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
+        if (sourceID != 0) {
+            g_source_remove(sourceID);
+            sourceID = 0;
+            gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
+        }
+    }
+}
 
 static void reset_timer(GtkButton *reset_button, gpointer user_data) {
     isFirstClick = 1;
@@ -23,7 +56,11 @@ static void reset_timer(GtkButton *reset_button, gpointer user_data) {
     userData *uD = user_data;
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->playButton), 0);
     gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
-    gtk_label_set_text(GTK_LABEL(uD->timerLabel), "25:00");
+
+    gchar *new_label = g_strdup_printf(
+        "%d:00", (isFocusMode ? FOCUS_TIME / 60 : BREAK_TIME / 60));
+
+    gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
 }
 
 static gboolean calculate_remaining(gpointer data) {
@@ -45,7 +82,8 @@ static gboolean calculate_remaining(gpointer data) {
 static void play_timer(GtkToggleButton *play_button, gpointer data) {
 
     if (isFirstClick) {
-        target = g_get_monotonic_time() + (POMODORO_TIME * 1000000);
+        target = g_get_monotonic_time() +
+                 ((isFocusMode ? FOCUS_TIME : BREAK_TIME) * 1000000);
         calculate_remaining(data);
         isFirstClick = 0;
     }
@@ -64,13 +102,9 @@ static void play_timer(GtkToggleButton *play_button, gpointer data) {
 }
 
 static void activate(GtkApplication *app, gpointer user_data) {
-    GtkWidget *window;
-    GtkWidget *play_button;
-    GtkWidget *settings_button;
-    GtkWidget *reset_button;
-    GtkWidget *grid;
+    GtkWidget *window, *play_button, *settings_button, *reset_button, *grid,
+        *timer_label, *focus_button, *toggle_mode_button, *break_button;
     GtkCssProvider *css = gtk_css_provider_new();
-    GtkWidget *timer_label;
 
     gtk_css_provider_load_from_path(css, "style.css");
     gtk_style_context_add_provider_for_display(
@@ -80,7 +114,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     g_object_unref(css);
 
     window = gtk_application_window_new(app);
-    gtk_window_set_title(GTK_WINDOW(window), "Pomodoro");
+    gtk_window_set_title(GTK_WINDOW(window), "Focus Timer");
     gtk_window_set_default_size(GTK_WINDOW(window), 320, 320);
 
     grid = gtk_grid_new();
@@ -92,6 +126,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
     play_button = gtk_toggle_button_new_with_label("▸");
     settings_button = gtk_button_new_with_label("⚙");
     reset_button = gtk_button_new_with_label("↻");
+    focus_button = gtk_button_new_with_label("Focus Mode");
+    break_button = gtk_button_new_with_label("Break Mode");
 
     gtk_widget_add_css_class(GTK_WIDGET(play_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(settings_button), "action-btn");
@@ -105,11 +141,17 @@ static void activate(GtkApplication *app, gpointer user_data) {
     ud.playButton = play_button;
 
     g_signal_connect(reset_button, "clicked", G_CALLBACK(reset_timer), &ud);
+    g_signal_connect(focus_button, "clicked", G_CALLBACK(switch_to_focus_mode),
+                     &ud);
+    g_signal_connect(break_button, "clicked", G_CALLBACK(switch_to_break_mode),
+                     &ud);
+
+    gtk_grid_attach(GTK_GRID(grid), timer_label, 0, 0, 24, 24);
     gtk_grid_attach(GTK_GRID(grid), play_button, 10, 28, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), settings_button, 12, 28, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), reset_button, 14, 28, 2, 2);
-    gtk_grid_attach(GTK_GRID(grid), timer_label, 0, 0, 24, 24);
-
+    gtk_grid_attach(GTK_GRID(grid), focus_button, 0, 28, 2, 2);
+    gtk_grid_attach(GTK_GRID(grid), break_button, 2, 28, 2, 2);
     gtk_window_present(GTK_WINDOW(window));
 }
 
