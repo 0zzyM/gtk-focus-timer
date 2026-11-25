@@ -4,17 +4,28 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-const uint16_t FOCUS_M = 25, BREAK_M = 5;
-const uint32_t FOCUS_TIME = FOCUS_M * 60, BREAK_TIME = BREAK_M * 60;
 gint64 ms, target, remaining_total_s, remaining_m, remaining_s, sourceID = 0;
-gboolean isFirstClick = 1, isFocusMode = 1;
+gboolean isFirstClick = 1, isFocusMode = 1, isSettingsOpen = 0;
 
 typedef struct {
     GtkWidget *timerLabel;
     GtkWidget *playButton;
     GtkWidget *resetButton;
     GtkWidget *settingsGrid;
+    GtkWidget *grid;
+    GtkWidget *focusSpinButton;
+    gint32 FOCUS_M;
+    gint32 BREAK_M;
+
 } userData;
+
+static void set_focus_time(GtkButton *apply_settings_button,
+                           gpointer user_data) {
+    userData *uD = user_data;
+    gint32 new_focus_m =
+        gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->focusSpinButton));
+    uD->FOCUS_M = new_focus_m;
+}
 
 static void close_settings(GtkButton *close_settings_button,
                            gpointer user_data) {
@@ -25,6 +36,7 @@ static void close_settings(GtkButton *close_settings_button,
 static void open_settings(GtkButton *settings_button, gpointer user_data) {
     userData *uD = user_data;
     gtk_widget_set_visible(uD->settingsGrid, true);
+    gtk_widget_add_css_class(GTK_WIDGET(uD->grid), "grid-offline");
 }
 
 static void reset_timer(gpointer user_data) {
@@ -37,8 +49,8 @@ static void reset_timer(gpointer user_data) {
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(uD->playButton), 0);
     gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
 
-    gchar *new_label = g_strdup_printf(
-        "%02d:00", (isFocusMode ? FOCUS_TIME / 60 : BREAK_TIME / 60));
+    gchar *new_label =
+        g_strdup_printf("%02d:00", (isFocusMode ? uD->FOCUS_M : uD->BREAK_M));
 
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
 }
@@ -61,6 +73,8 @@ static void reset_onClick(GtkButton *reset_button, gpointer user_data) {
 
 static gboolean calculate_remaining(gpointer data) {
 
+    userData *uD = data;
+
     ms = g_get_monotonic_time();
 
     remaining_total_s = (target - ms + 999999) / 1000000;
@@ -68,7 +82,7 @@ static gboolean calculate_remaining(gpointer data) {
     remaining_s = remaining_total_s % 60;
 
     gchar *lbl = g_strdup_printf("%02ld:%02ld", remaining_m, remaining_s);
-    gtk_label_set_text(data, lbl);
+    gtk_label_set_text(GTK_LABEL(uD->timerLabel), lbl);
     if (remaining_total_s <= 0)
         return 0;
     return 1;
@@ -76,9 +90,12 @@ static gboolean calculate_remaining(gpointer data) {
 
 static void play_timer(GtkToggleButton *play_button, gpointer data) {
 
+    userData *uD = data;
+
     if (isFirstClick) {
-        target = g_get_monotonic_time() +
-                 ((isFocusMode ? FOCUS_TIME : BREAK_TIME) * 1000000);
+        target =
+            g_get_monotonic_time() +
+            ((isFocusMode ? uD->FOCUS_M * 60 : uD->BREAK_M * 60) * 1000000);
         calculate_remaining(data);
         isFirstClick = 0;
     }
@@ -153,11 +170,12 @@ static void activate(GtkApplication *app, gpointer user_data) {
                             close_settings_button);
 
     gtk_widget_add_css_class(GTK_WIDGET(timer_label), "timer-label");
-    gtk_widget_add_css_class(GTK_WIDGET(play_button), "action-btn");
+    gtk_widget_add_css_class(GTK_WIDGET(play_button), "play-btn");
     gtk_widget_add_css_class(GTK_WIDGET(settings_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(reset_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(focus_button), "action-btn");
     gtk_widget_add_css_class(GTK_WIDGET(break_button), "action-btn");
+    gtk_widget_add_css_class(GTK_WIDGET(grid), "grid");
     gtk_widget_add_css_class(GTK_WIDGET(settings_grid), "settings-grid");
 
     gtk_widget_set_cursor_from_name(play_button, "pointer");
@@ -168,7 +186,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     gtk_grid_attach(GTK_GRID(grid), settings_button, 22, 0, 2, 1);
     gtk_grid_attach(GTK_GRID(grid), timer_label, 0, 1, 24, 24);
-    gtk_grid_attach(GTK_GRID(grid), play_button, 11, 26, 2, 2);
+    gtk_grid_attach(GTK_GRID(grid), play_button, 11, 26, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), reset_button, 0, 0, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), focus_button, 8, 26, 2, 2);
     gtk_grid_attach(GTK_GRID(grid), break_button, 14, 26, 2, 2);
@@ -188,9 +206,12 @@ static void activate(GtkApplication *app, gpointer user_data) {
     ud.playButton = play_button;
     ud.resetButton = reset_button;
     ud.settingsGrid = settings_grid;
+    ud.grid = grid;
+    ud.focusSpinButton = focus_spin_button;
+    ud.FOCUS_M = 25;
+    ud.BREAK_M = 5;
 
-    g_signal_connect(play_button, "toggled", G_CALLBACK(play_timer),
-                     timer_label);
+    g_signal_connect(play_button, "toggled", G_CALLBACK(play_timer), &ud);
     g_signal_connect(reset_button, "clicked", G_CALLBACK(reset_onClick), &ud);
     g_signal_connect(focus_button, "clicked", G_CALLBACK(switch_to_focus_mode),
                      &ud);
@@ -200,6 +221,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
                      &ud);
     g_signal_connect(close_settings_button, "clicked",
                      G_CALLBACK(close_settings), &ud);
+    g_signal_connect(apply_settings_button, "clicked",
+                     G_CALLBACK(set_focus_time), &ud);
 
     gtk_window_present(GTK_WINDOW(window));
 }
