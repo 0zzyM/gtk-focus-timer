@@ -2,8 +2,8 @@
     background-color: grey;
 }
 
-.grid-offline {
-    background-color: rgba(1, 1, 1, 0.8);
+.grid{
+    background-color: inherit ws;
 }
 
 .timer-label {

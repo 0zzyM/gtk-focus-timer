@@ -14,31 +14,11 @@ typedef struct {
     GtkWidget *settingsGrid;
     GtkWidget *grid;
     GtkWidget *focusSpinButton;
+    GtkWidget *breakSpinButton;
     gint32 FOCUS_M;
     gint32 BREAK_M;
-
+    GtkWidget *overlay;
 } userData;
-
-static void set_focus_time(GtkButton *apply_settings_button,
-                           gpointer user_data) {
-    userData *uD = user_data;
-    gint32 new_focus_m =
-        gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->focusSpinButton));
-    uD->FOCUS_M = new_focus_m;
-}
-
-static void close_settings(GtkButton *close_settings_button,
-                           gpointer user_data) {
-    userData *uD = user_data;
-    gtk_widget_set_visible(uD->settingsGrid, false);
-}
-
-static void open_settings(GtkButton *settings_button, gpointer user_data) {
-    userData *uD = user_data;
-    gtk_widget_set_visible(uD->settingsGrid, true);
-    gtk_widget_add_css_class(GTK_WIDGET(uD->grid), "grid-offline");
-}
-
 static void reset_timer(gpointer user_data) {
     isFirstClick = 1;
     if (sourceID != 0) {
@@ -53,6 +33,47 @@ static void reset_timer(gpointer user_data) {
         g_strdup_printf("%02d:00", (isFocusMode ? uD->FOCUS_M : uD->BREAK_M));
 
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
+}
+
+
+static void set_focus_time(gpointer user_data) {
+    userData *uD = user_data;
+    gint32 new_focus_m =
+        gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->focusSpinButton));
+
+    uD->FOCUS_M = new_focus_m;
+    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay), GTK_WIDGET(uD->settingsGrid),false);
+}
+
+static void set_break_time(gpointer user_data) {
+    userData *uD = user_data;
+    gint32 new_break_m =
+        gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->breakSpinButton));
+    uD->BREAK_M = new_break_m;
+}
+
+static void apply_settings(GtkButton *apply_settings_button,
+                            gpointer user_data) {
+
+    userData *uD = user_data;
+    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay), GTK_WIDGET(uD->settingsGrid),true);
+    set_focus_time(user_data);
+    set_break_time(user_data);
+if(sourceID == 0)
+        reset_timer(user_data);
+
+}
+static void close_settings(GtkButton *close_settings_button,
+                           gpointer user_data) {
+    userData *uD = user_data;
+    gtk_widget_set_visible(uD->settingsGrid, false);
+    gtk_widget_set_sensitive(GTK_WIDGET(uD->grid), true);
+    }
+
+static void open_settings(GtkButton *settings_button, gpointer user_data) {
+    userData *uD = user_data;
+    gtk_widget_set_visible(uD->settingsGrid, true);
+    gtk_widget_set_sensitive(GTK_WIDGET(uD->grid), false);
 }
 
 static void switch_to_focus_mode(GtkButton *focus_button, gpointer user_data) {
@@ -208,8 +229,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
     ud.settingsGrid = settings_grid;
     ud.grid = grid;
     ud.focusSpinButton = focus_spin_button;
+    ud.breakSpinButton = break_spin_button;
     ud.FOCUS_M = 25;
     ud.BREAK_M = 5;
+    ud.overlay = overlay;
 
     g_signal_connect(play_button, "toggled", G_CALLBACK(play_timer), &ud);
     g_signal_connect(reset_button, "clicked", G_CALLBACK(reset_onClick), &ud);
@@ -222,7 +245,8 @@ static void activate(GtkApplication *app, gpointer user_data) {
     g_signal_connect(close_settings_button, "clicked",
                      G_CALLBACK(close_settings), &ud);
     g_signal_connect(apply_settings_button, "clicked",
-                     G_CALLBACK(set_focus_time), &ud);
+                     G_CALLBACK(apply_settings), &ud);
+
 
     gtk_window_present(GTK_WINDOW(window));
 }
