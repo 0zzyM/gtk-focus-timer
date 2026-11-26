@@ -15,9 +15,10 @@ typedef struct {
     GtkWidget *grid;
     GtkWidget *focusSpinButton;
     GtkWidget *breakSpinButton;
-    gint32 FOCUS_M;
-    gint32 BREAK_M;
+    gint64 FOCUS_M;
+    gint64 BREAK_M;
     GtkWidget *overlay;
+    GtkMediaStream *alarm;
 } userData;
 static void reset_timer(gpointer user_data) {
     isFirstClick = 1;
@@ -30,45 +31,45 @@ static void reset_timer(gpointer user_data) {
     gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
 
     gchar *new_label =
-        g_strdup_printf("%02d:00", (isFocusMode ? uD->FOCUS_M : uD->BREAK_M));
+        g_strdup_printf("%02ld:00", (isFocusMode ? uD->FOCUS_M : uD->BREAK_M));
 
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
 }
 
-
 static void set_focus_time(gpointer user_data) {
     userData *uD = user_data;
-    gint32 new_focus_m =
+    gint64 new_focus_m =
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->focusSpinButton));
 
     uD->FOCUS_M = new_focus_m;
-    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay), GTK_WIDGET(uD->settingsGrid),false);
+    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay),
+                                 GTK_WIDGET(uD->settingsGrid), false);
 }
 
 static void set_break_time(gpointer user_data) {
     userData *uD = user_data;
-    gint32 new_break_m =
+    gint64 new_break_m =
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->breakSpinButton));
     uD->BREAK_M = new_break_m;
 }
 
 static void apply_settings(GtkButton *apply_settings_button,
-                            gpointer user_data) {
+                           gpointer user_data) {
 
     userData *uD = user_data;
-    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay), GTK_WIDGET(uD->settingsGrid),true);
+    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay),
+                                 GTK_WIDGET(uD->settingsGrid), true);
     set_focus_time(user_data);
     set_break_time(user_data);
-if(sourceID == 0)
+    if (sourceID == 0)
         reset_timer(user_data);
-
 }
 static void close_settings(GtkButton *close_settings_button,
                            gpointer user_data) {
     userData *uD = user_data;
     gtk_widget_set_visible(uD->settingsGrid, false);
     gtk_widget_set_sensitive(GTK_WIDGET(uD->grid), true);
-    }
+}
 
 static void open_settings(GtkButton *settings_button, gpointer user_data) {
     userData *uD = user_data;
@@ -104,8 +105,10 @@ static gboolean calculate_remaining(gpointer data) {
 
     gchar *lbl = g_strdup_printf("%02ld:%02ld", remaining_m, remaining_s);
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), lbl);
-    if (remaining_total_s <= 0)
+    if (remaining_total_s <= 0) {
+        gtk_media_stream_set_playing(GTK_MEDIA_STREAM(uD->alarm), 1);
         return 0;
+    }
     return 1;
 }
 
@@ -142,6 +145,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
         *apply_settings_button, *settings_header_bar, *settings_header_layout,
         *settings_title_label;
     GtkCssProvider *css = gtk_css_provider_new();
+    GtkMediaStream *alarm;
 
     gtk_css_provider_load_from_path(css, "style.css");
     gtk_style_context_add_provider_for_display(
@@ -171,6 +175,9 @@ static void activate(GtkApplication *app, gpointer user_data) {
     reset_button = gtk_button_new_with_label("↻");
     focus_button = gtk_button_new_with_label(" Focus");
     break_button = gtk_button_new_with_label("Break");
+
+    alarm = gtk_media_file_new();
+    gtk_media_file_set_filename(GTK_MEDIA_FILE(alarm), "./alarm.wav");
 
     settings_header_bar = gtk_header_bar_new();
     settings_title_label = gtk_label_new("Settings");
@@ -233,6 +240,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     ud.FOCUS_M = 25;
     ud.BREAK_M = 5;
     ud.overlay = overlay;
+    ud.alarm = alarm;
 
     g_signal_connect(play_button, "toggled", G_CALLBACK(play_timer), &ud);
     g_signal_connect(reset_button, "clicked", G_CALLBACK(reset_onClick), &ud);
@@ -246,7 +254,6 @@ static void activate(GtkApplication *app, gpointer user_data) {
                      G_CALLBACK(close_settings), &ud);
     g_signal_connect(apply_settings_button, "clicked",
                      G_CALLBACK(apply_settings), &ud);
-
 
     gtk_window_present(GTK_WINDOW(window));
 }
