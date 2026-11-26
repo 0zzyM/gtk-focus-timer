@@ -19,6 +19,7 @@ typedef struct {
     gint64 BREAK_M;
     GtkWidget *overlay;
     GtkMediaStream *alarm;
+    GKeyFile *configFile;
 } userData;
 static void reset_timer(gpointer user_data) {
     isFirstClick = 1;
@@ -36,14 +37,15 @@ static void reset_timer(gpointer user_data) {
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), new_label);
 }
 
+
 static void set_focus_time(gpointer user_data) {
     userData *uD = user_data;
     gint64 new_focus_m =
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->focusSpinButton));
 
     uD->FOCUS_M = new_focus_m;
-    gtk_overlay_set_clip_overlay(GTK_OVERLAY(uD->overlay),
-                                 GTK_WIDGET(uD->settingsGrid), false);
+    g_key_file_set_integer(uD->configFile, "USER SETTINGS", "FOCUS_M",
+                           new_focus_m);
 }
 
 static void set_break_time(gpointer user_data) {
@@ -51,6 +53,9 @@ static void set_break_time(gpointer user_data) {
     gint64 new_break_m =
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(uD->breakSpinButton));
     uD->BREAK_M = new_break_m;
+    g_key_file_set_integer(uD->configFile, "USER SETTINGS", "BREAK_M",
+                           new_break_m);
+
 }
 
 static void apply_settings(GtkButton *apply_settings_button,
@@ -61,6 +66,7 @@ static void apply_settings(GtkButton *apply_settings_button,
                                  GTK_WIDGET(uD->settingsGrid), true);
     set_focus_time(user_data);
     set_break_time(user_data);
+    g_key_file_save_to_file(uD->configFile, "./config.ini", NULL);
     if (sourceID == 0)
         reset_timer(user_data);
 }
@@ -147,6 +153,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
         *settings_title_label;
     GtkCssProvider *css = gtk_css_provider_new();
     GtkMediaStream *alarm;
+    GKeyFile *config_file;
 
     gtk_css_provider_load_from_path(css, "style.css");
     gtk_style_context_add_provider_for_display(
@@ -170,8 +177,19 @@ static void activate(GtkApplication *app, gpointer user_data) {
     gtk_widget_set_halign(settings_grid, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(settings_grid, GTK_ALIGN_CENTER);
 
+
+    config_file = g_key_file_new();
+    g_key_file_load_from_file(config_file, "./config.ini", G_KEY_FILE_NONE, NULL);
+
+
+    gint64 FOCUS_M = g_key_file_get_integer(config_file, "USER SETTINGS", "FOCUS_M", NULL);
+    gint64 BREAK_M = g_key_file_get_integer(config_file, "USER SETTINGS", "BREAK_M", NULL);
+
+
+
     settings_button = gtk_button_new_with_label("⚙");
-    timer_label = gtk_label_new("25:00");
+    gchar *timer_str = g_strdup_printf("%02ld:00", FOCUS_M);
+    timer_label = gtk_label_new(timer_str );
     play_button = gtk_toggle_button_new_with_label("►");
     reset_button = gtk_button_new_with_label("↻");
     focus_button = gtk_button_new_with_label(" Focus");
@@ -182,11 +200,10 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     settings_header_bar = gtk_header_bar_new();
     settings_title_label = gtk_label_new("Settings");
-        gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(settings_header_bar),
+    gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(settings_header_bar),
                                           0);
     gtk_header_bar_set_title_widget(GTK_HEADER_BAR(settings_header_bar),
                                     settings_title_label);
-
     focus_spin_button = gtk_spin_button_new_with_range(1, 60, 1);
     break_spin_button = gtk_spin_button_new_with_range(1, 60, 1);
     focus_setting_text = gtk_label_new("Focus time:");
@@ -236,8 +253,9 @@ static void activate(GtkApplication *app, gpointer user_data) {
     ud.grid = grid;
     ud.focusSpinButton = focus_spin_button;
     ud.breakSpinButton = break_spin_button;
-    ud.FOCUS_M = 25;
-    ud.BREAK_M = 5;
+    ud.configFile = config_file;
+    ud.FOCUS_M = g_key_file_get_integer(config_file, "USER SETTINGS", "FOCUS_M", NULL);
+    ud.BREAK_M = g_key_file_get_integer(config_file, "USER SETTINGS", "BREAK_M", NULL);
     ud.overlay = overlay;
     ud.alarm = alarm;
 
