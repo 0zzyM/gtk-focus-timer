@@ -107,6 +107,7 @@ static gboolean calculate_remaining(gpointer data) {
     gtk_label_set_text(GTK_LABEL(uD->timerLabel), lbl);
     if (remaining_total_s <= 0) {
         gtk_media_stream_set_playing(GTK_MEDIA_STREAM(uD->alarm), 1);
+        gtk_button_set_label(GTK_BUTTON(uD->playButton), "►");
         return 0;
     }
     return 1;
@@ -181,9 +182,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
 
     settings_header_bar = gtk_header_bar_new();
     settings_title_label = gtk_label_new("Settings");
-    gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(settings_header_bar),
-                                          true);
-    gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(settings_header_bar),
+        gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(settings_header_bar),
                                           0);
     gtk_header_bar_set_title_widget(GTK_HEADER_BAR(settings_header_bar),
                                     settings_title_label);
